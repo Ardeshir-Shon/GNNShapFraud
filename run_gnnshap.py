@@ -1,12 +1,23 @@
 import argparse
 import pickle
 import time
+import os
 
 import torch
 from tqdm.auto import tqdm
 
 from dataset.utils import get_model_data_config
 from gnnshap.explainer import GNNShapExplainer
+
+from sklearn.metrics import precision_score, recall_score, f1_score, confusion_matrix
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+from dataset.configs import get_config
+
+from mymodels import GCN, GAT
+import torch.nn.functional as F
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -39,19 +50,74 @@ if __name__ == '__main__':
 
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model, data, config = get_model_data_config(dataset_name, load_pretrained=True, device=device)
+
+    if dataset_name != 'Elliptic':
+        model, data, config = get_model_data_config(dataset_name, load_pretrained=True, device=device)
+    else:
+        config = get_config(dataset_name)
+        root_path = config['root_path']
+
+        # Load the dataset
+        data = torch.load(os.path.join(config['root_path'], 'data.pt')) 
+        model = torch.load(os.path.join(config['root_path'], 'model.pt'))
+        model = model.to(device)
+    
+
+    # Ensure test_nodes is set
+    if 'test_nodes' not in config or config['test_nodes'] is None:
+        config['test_nodes'] = data.test_mask.nonzero(as_tuple=True)[0].tolist()
+
 
     test_nodes = config['test_nodes']
 
     result_path = args.result_path if args.result_path is not None else config["results_path"]
 
 
-
-
     if sampler_name == "SVXSampler":
         extra_param_suffixes = f"_{args.size_lim}"
     else:
         extra_param_suffixes = ""
+
+    # Evaluate the model
+    model.eval()
+    with torch.no_grad():
+        out = model(data)
+        test_loss = F.nll_loss(out[data.test_mask], data.y[data.test_mask])
+        _, pred = out.max(dim=1)
+
+        # Extract actual labels and predictions
+        actuals = data.y[data.test_mask].cpu().numpy()
+        predictions = pred[data.test_mask].cpu().numpy()
+
+        # Calculate accuracy
+        correct = int((predictions == actuals).sum())
+        acc = correct / len(actuals)
+        print(f'Test Loss: {test_loss.item()}, Accuracy: {acc}')
+
+        # Calculate recall
+        recall = recall_score(actuals, predictions, average='macro')  # 'macro' averages recall across classes
+        print(f'Recall: {recall}')
+
+        # Calculate precision
+        precision = precision_score(actuals, predictions, average='macro')  # 'macro' averages precision across classes
+        print(f'Precision: {precision}')
+
+        # Calculate F1 score
+        f1 = f1_score(actuals, predictions, average='macro')  # 'macro' averages F1 score across classes
+        print(f'F1 Score: {f1}')
+
+        # Compute confusion matrix
+        cm = confusion_matrix(actuals, predictions)
+        print(f'Confusion Matrix:\n{cm}')
+
+        # Plot confusion matrix
+        class_labels = ['Non-Fraud', 'Fraud']  # Update with your actual class labels
+        sns.heatmap(cm, annot=True, fmt="d", cmap='Blues', xticklabels=class_labels, yticklabels=class_labels)
+        plt.title('Confusion Matrix')
+        plt.xlabel('Predicted Labels')
+        plt.ylabel('True Labels')
+        plt.show()
+
 
     #explain_node_idx = 0
     for r in range(args.repeat):
