@@ -74,6 +74,12 @@ def get_model_data_config(dataset_name, device='cpu', load_pretrained=True,
 
     config = get_config(dataset_name)
     root_path = config['root_path']
+    if 'Elliptic' in dataset_name:
+        data = torch.load(os.path.join(root_path, 'data.pt'))
+        model = torch.load(os.path.join(root_path, 'model.pt'))
+        print("Model loaded from the disk")
+        # model = model.to(device)
+        return model, data,config
 
     if 'Cora' in dataset_name:
         dataset = Planetoid(root=f'{root_path}/data/Planetoid', name='Cora',

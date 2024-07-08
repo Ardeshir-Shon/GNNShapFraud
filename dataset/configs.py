@@ -51,6 +51,20 @@ def get_config(conf_name):
                     'feat':'Expectation'},
 
         },
+        'Elliptic': {
+            'hidden_dim': 16,
+            'model': 'GCN',
+            'num_layers': 2,
+            'epoch': 250,  # Adjusted to match your training example
+            'lr': 0.01,  # Matching your example
+            'weight_decay': 5e-4,  # Matching your example
+            'dropout': 0.5,  # Commonly used value
+            'normalize': True,
+            'add_self_loops': True,
+            'test_nodes': None,
+            'graphSVX_args': {'num_samples': 1000, 'S': 3, 'coal': 'SmarterSeparate',
+                              'feat': 'Expectation'},
+        },
         'PubMed': {
             'hidden_dim': 16,
             'model': 'GCNModel',
