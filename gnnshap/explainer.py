@@ -14,6 +14,8 @@ from gnnshap.solvers import get_solver
 from gnnshap.utils import *
 from gnnshap.explanation import GNNShapExplanation
 
+from torch_geometric.data import Data
+
 log = get_logger(__name__)
 
 
@@ -40,7 +42,20 @@ def default_predict_fn(model: torch.nn.Module,
     model.eval()
 
     # [node_idx] will only work for non-batched. [node_idx, :] works for both
-    pred = model.forward(node_features, edge_index, edge_weight=edge_weight)
+    # if edge_weight is not None:
+    #     pred = model(node_features, edge_index, edge_weight=edge_weight)
+    # else:
+    #     pred = model(node_features, edge_index)
+
+    # Create a Data object
+    data = Data(x=node_features, edge_index=edge_index)
+    if edge_weight is not None:
+        data.edge_weight = edge_weight
+    else:
+        data.edge_weight = None
+
+
+    pred = model(data)
 
     # this is for 3d predictions tensors
     # pred = pred[node_idx, :] if len(pred.size()) == 2 else pred[:, node_idx, :]
